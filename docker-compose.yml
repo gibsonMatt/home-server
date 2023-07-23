@@ -226,7 +226,7 @@ services:
       - COOKIE_DOMAIN=gibsonmatthew.com
       - AUTH_HOST=oauth.gibsonmatthew.com
       - LOG_LEVEL=debug
-      - WHITELIST=matthew.j.s.gibson@gmail.com
+      - WHITELIST=
     labels:
       - "traefik.docker.network=traefik_proxy"
       - "traefik.enable=true"
