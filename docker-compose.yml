@@ -1,0 +1,257 @@
+version: "3.3"
+networks:
+  traefik_proxy:
+    name: traefik_proxy
+    driver: bridge
+  default:
+    driver: bridge
+services:
+  traefik:
+    hostname: traefik
+    image: traefik:v1.7.16
+    container_name: traefik
+    restart: always
+    domainname: gibsonmatthew.com
+    environment:
+      - PUID=1000
+      - PGID=1000
+    networks:
+      - traefik_proxy
+    ports:
+      - "443:443"
+      - "8080:8080"
+    labels:
+      - "traefik.enable=false"
+      - "traefik.backend=traefik"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.frontend.headers.SSLRedirect=true"
+      - "traefik.frontend.headers.STSSeconds=315360000"
+      - "traefik.frontend.headers.browserXSSFilter=true"
+      - "traefik.frontend.headers.contentTypeNosniff=true"
+      - "traefik.frontend.headers.forceSTSHeader=true"
+      - "traefik.frontend.headers.SSLHost=gibsonmatthew.com"
+      - "traefik.frontend.headers.STSIncludeSubdomains=true"
+      - "traefik.frontend.headers.STSPreload=true"
+      - "traefik.frontend.headers.frameDeny=true"
+      - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/home/matt/docker/traefik/traefik.toml:/traefik.toml"
+      - "/home/matt/docker/traefik/access.log:/access.log"
+      - "/home/matt/docker/traefik/traefik.log:/traefik.log"
+      - "/home/matt/docker/traefik/acme/acme.json:/etc/traefik/acme.json"
+      - "/home/matt/docker/traefik/logs:/var/log/traefik"
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    restart: always
+    networks:
+      - traefik_proxy
+    ports:
+      - "32400:32400/tcp"
+      - "3005:3005/tcp"
+      - "8324:8324/tcp"
+      - "32469:32469/tcp"
+      - "1900:1900/udp"
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - VERSION=docker
+      - ADVERTISE_IP="https://plex.gibsonmatthew.com:443"
+      - PLEX_CLAIM=""
+    volumes:
+      - /home/matt/docker/plex:/config
+      - /mnt/md0/movies:/movies
+      - /mnt/md0/tv:/tv
+      - /media/matt/thevoid/plex/:/void
+    labels:
+      - "traefik.frontend.rule=Host:plex.gibsonmatthew.com"
+      - "traefik.enable=true"
+      - "traefik.backend=plex"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.port=32400"
+  dash:
+    image: mauricenino/dashdot
+    restart: always
+    container_name: dash
+    privileged: true
+    networks:
+      - traefik_proxy
+    ports:
+      - "3001:3001"
+    volumes:
+      - /:/mnt/host:ro
+    labels:
+      - "traefik.frontend.rule=Host:dash.gibsonmatthew.com"
+      - "traefik.enable=true"
+      - "traefik.backend=dash"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.port=3001"
+      - "traefik.frontend.auth.forward.address=http://oauth:4181"
+      - "traefik.frontend.auth.forward.authResponseHeaders=X-Forwarded-User"
+      - "traefik.frontend.auth.forward.trustForwardHeader=true"
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: always
+    networks:
+      - traefik_proxy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    ports:
+      - "7878:7878"
+    volumes:
+      - /home/matt/docker/radarr:/config
+      - /mnt/md0/movies:/movies
+      - /mnt/md0/tv:/tv
+      - /mnt/md0/downloads:/downloads
+      - /media/matt/thevoid/plex/:/void
+    labels:
+      - "traefik.frontend.rule=Host:radarr.gibsonmatthew.com"
+      - "traefik.enable=true"
+      - "traefik.backend=radarr"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.port=7878"
+      - "traefik.frontend.auth.forward.address=http://oauth:4181"
+      - "traefik.frontend.auth.forward.authResponseHeaders=X-Forwarded-User"
+      - "traefik.frontend.auth.forward.trustForwardHeader=true"
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarra
+    restart: always
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    networks:
+      - traefik_proxy
+    ports:
+      - "8989:8989"
+    volumes:
+      - /home/matt/docker/sonarr:/config
+      - /mnt/md0/tv:/tv
+      - /mnt/md0/downloads:/downloads
+      - /media/matt/thevoid/plex/:/void  
+    labels:
+      - "traefik.frontend.rule=Host:sonarr.gibsonmatthew.com"
+      - "traefik.enable=true"
+      - "traefik.backend=sonarr"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.port=8989"
+      - "traefik.frontend.auth.forward.address=http://oauth:4181"
+      - "traefik.frontend.auth.forward.authResponseHeaders=X-Forwarded-User"
+      - "traefik.frontend.auth.forward.trustForwardHeader=true"
+  torrent:
+    image: dyonr/qbittorrentvpn
+    container_name: torrent
+    restart: always
+    privileged: true
+    networks:
+      - traefik_proxy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - VPN_ENABLED=yes
+      - VPN_TYPE=openvpn
+      - VPN_USERNAME=
+      - VPN_PASSWORD=
+      - LAN_NETWORK=
+      - ENABLE_SSL=no
+    ports:
+      - "8081:8080"
+      - "8999:8999"
+      - "8999:8999/udp"
+    volumes:
+      - /home/matt/docker/torrent:/config
+      - /mnt/md0/downloads:/downloads
+    labels:
+      - "traefik.enable=false"
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: jackett
+    restart: always
+    networks:
+      - traefik_proxy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - AUTO_UPDATE=true
+    ports:
+      - "9117:9117"
+    volumes:
+      - /home/matt/docker/jackett:/config
+      - /mnt/md0/downloads:/downloads
+    labels:
+      - "traefik.enable=false"
+  portainer:
+    image: portainer/portainer
+    container_name: portainer
+    restart: always
+    ports:
+      - "9000:9000"
+    networks:
+      - traefik_proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/matt/docker/portainer:/data
+    labels:
+      - "traefik.frontend.rule=Host:portainer.gibsonmatthew.com"
+      - "traefik.enable=true"
+      - "traefik.backend=portainer"
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.port=9000"
+      - "traefik.frontend.auth.forward.address=http://oauth:4181"
+      - "traefik.frontend.auth.forward.authResponseHeaders=X-Forwarded-User"
+      - "traefik.frontend.auth.forward.trustForwardHeader=true"
+  oauth:
+    image: thomseddon/traefik-forward-auth:2.1.0
+    container_name: oauth
+    restart: always
+    networks:
+      - traefik_proxy
+    environment: 
+      - PROVIDERS_GOOGLE_CLIENT_ID=
+      - PROVIDERS_GOOGLE_CLIENT_SECRET=
+      - SECRET=
+      - INSECURE_COOKIE=false
+      - COOKIE_DOMAIN=gibsonmatthew.com
+      - AUTH_HOST=oauth.gibsonmatthew.com
+      - LOG_LEVEL=debug
+      - WHITELIST=matthew.j.s.gibson@gmail.com
+    labels:
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=Host:oauth.gibsonmatthew.com"
+      - "traefik.port=4181"
+      - "traefik.frontend.auth.forward.address=http://oauth:4181"
+      - "traefik.frontend.auth.forward.authResponseHeaders=X-Forwarded-User"
+      - "traefik.frontend.auth.forward.trustForwardHeader=true"
+  homarr:
+    container_name: homarr
+    image: ghcr.io/ajnart/homarr:0.12.2
+    restart: always
+    privileged: true
+    networks:
+      - traefik_proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/matt/docker/homarr:/app/data/configs
+      - /home/matt/docker/homarr/icons:/app/public/icons
+      - /:/mnt/host:ro
+    ports:
+      - '7575:7575'
+    labels:
+      - "traefik.docker.network=traefik_proxy"
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=Host:dashboard.gibsonmatthew.com"
+      - "traefik.port=7575"
+      - "traefik.frontend.auth.basic.users=
